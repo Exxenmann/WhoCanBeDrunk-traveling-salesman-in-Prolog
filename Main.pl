@@ -19,12 +19,15 @@ times(steve,1200).             %(name,ab wann kann er)
 times(bill,1400).
 times(hans,1300).
 times(guido,1500).
+times(ingo,800).
 f(steve).                      %hat führerschein
 f(guido).
+f(ingo).
 
 %Bars
 b(mata).
 b(oblomow).
+b(hacienda).
 
 %Sperrstunde, bis wann haben die Bars geöffnet?
 sperrstunde(2400).
@@ -35,25 +38,40 @@ l(X) :- p(X).                  %eine person ist eine location
 l(X) :- b(X).                  %eine bar ist eine location
 
 %Wegenetz
-cost(hans,bill,100).
-cost(hans,steve,100).
-cost(hans,mata,50).
-cost(hans,oblomow,150).
-cost(hans,guido,50).
+cost(hans,bill,50).
+cost(hans,steve,50).
+cost(hans,mata,25).
+cost(hans,oblomow,75).
+cost(hans,guido,25).
+cost(hans,ingo,500).
+cost(hans,hacienda,83).
 
-cost(bill,steve,150).
-cost(bill,mata,50).
-cost(bill,oblomow,100).
-cost(bill,guido,50).
+cost(bill,steve,75).
+cost(bill,mata,25).
+cost(bill,oblomow,50).
+cost(bill,guido,25).
+cost(bill,ingo,75).
+cost(bill,hacienda,12).
 
-cost(mata,steve,50).
-cost(mata,oblomow,100).
-cost(mata,guido,100).
+cost(mata,steve,25).
+cost(mata,oblomow,50).
+cost(mata,guido,50).
+cost(mata,ingo,10).
+cost(mata,hacienda,69).
 
-cost(steve,oblomow,100).
-cost(steve,guido,50).
+cost(steve,oblomow,50).
+cost(steve,guido,25).
+cost(steve,ingo,500).
+cost(steve,hacienda,166).
 
-cost(oblomow,guido,50).
+cost(oblomow,guido,25).
+cost(oblomow,ingo,12).
+cost(oblomow,hacienda,89).
+
+cost(guido,ingo,50).
+cost(guido,hacienda,45).
+
+cost(ingo,hacienda,5).
 
 get_cost(X,Y,Z) :- cost(X,Y,Z).
 get_cost(X,Y,Z) :- cost(Y,X,Z).
@@ -64,13 +82,19 @@ get_cost(X,Y,Z) :- cost(Y,X,Z).
 Main
 *****************************/
 
-start_route(BestRoute, BarList, HomeRoute) :-
+go(FINAL_ROUTE) :-
   start_set(Start),                                       %Liste mit Routenstarts generieren
-  iterate_routelist(Start, AllRoutes),					  %Alle Abholrouten berechnen
-  get_best(AllRoutes,BestRoute),						  %Beste Route auswaehlen
-  add_bars(BestRoute, BarList),							  %Barroute inkl. Aufenthalt generieren
-  deliver_persons(BestRoute,BarList,HomeRoute).			  %Personen heimfahren
+  iterate_routelist(Start, AllRoutes),                    %Alle Abholrouten berechnen
+  get_best(AllRoutes,BestRoute),                          %Beste Route auswaehlen
+  add_bars(BestRoute, BarList),                           %Barroute inkl. Aufenthalt generieren
+  deliver_persons(BestRoute,BarList,HomeRoute),           %Personen heimfahren
+  append(BestRoute,BarList,X),
+  append(X,HomeRoute,FINAL_ROUTE).
   
+
+
+
+
 
 
 
@@ -127,27 +151,25 @@ starts([[Startpunkt,Abfahrt,Ankunft,Ziellocation]]) :-
   dif(Startpunkt,Ziellocation),                                 %start und ziel müssen verschieden sein
   earliest_time(Startpunkt,Ziellocation,Abfahrt,Ankunft).       %frühestmöglicher zeitpunkt
 
-
-
-%iterate_routelist determines, if there are any persons to catch and continues or ends the recursion											
+%iterate_routelist determines, if there are any persons to catch and continues or ends the recursion                                                                                    
 iterate_routelist(Routelisttodo, Routelistdone) :-
- [Testroute | _] = Routelisttodo, 								%extract one testroute
+ [Testroute | _] = Routelisttodo,                                                               %extract one testroute
  persons_todo(Testroute, Persons_todo),
  length(Persons_todo,X),
- do_next(X, Routelisttodo, Routelistdone).          			%Case
+ do_next(X, Routelisttodo, Routelistdone).                              %Case
  
 %do_next is something like a case in prolog :) 
-do_next(0, Routelisttodo, Routelistdone) :-						%End recursion, if zero 
+do_next(0, Routelisttodo, Routelistdone) :-                                             %End recursion, if zero 
  Routelistdone = Routelisttodo.
-do_next(_, Routelisttodo, Routelistdone) :-						%go on, if there are waypoints to do
+do_next(_, Routelisttodo, Routelistdone) :-                                             %go on, if there are waypoints to do
  routelist_iterator(Routelisttodo, [], Temp),
  iterate_routelist(Temp, Routelistdone).
 
 routelist_iterator([]        , RoutesDone, NewRoutelist) :- NewRoutelist = RoutesDone.
 routelist_iterator(RoutesTodo, RoutesDone, NewRoutelist) :-
- [OneRoute | Todo] = RoutesTodo, 								% [Eine Route] | [AlleUebrigenRouten]
- next_moves([OneRoute], [], OneRouteDone),						% 
- append(RoutesDone, OneRouteDone, NewRoutesDone),				
+ [OneRoute | Todo] = RoutesTodo,                                                                % [Eine Route] | [AlleUebrigenRouten]
+ next_moves([OneRoute], [], OneRouteDone),                                              % 
+ append(RoutesDone, OneRouteDone, NewRoutesDone),                               
  routelist_iterator(Todo, NewRoutesDone, NewRoutelist).
  %NewRoutelist = NewRoutesDone.
 
@@ -180,29 +202,32 @@ add_person(One_route, Persons_todo, Temp, Possible_next_moves) :-
 
 
 
+
+
+
+
+
+
 /**********************************
 BARS
 Partylustige Menschen suchen immer die nächstbeste Bar und wollen bis zur Sperrstunde überall mal gewesen sein
 ***********************************/
 
-
-add_bars(BestList, BarList) :-					%BestList hat die Form [[x,5,y],...[z,8,t]]
- start_bar(BestList, Startpoint),				%generiert den ersten Punkt in Form [[Person, 1600, 1700, Bar]]
+add_bars(BestList, BarList) :-                                  %BestList hat die Form [[x,5,y],...[z,8,t]]
+ start_bar(BestList, Startpoint),                               %generiert den ersten Punkt in Form [[Person, 1600, 1700, Bar]]
  iterate_barlist(Startpoint, BarListTimeless),
  maximize_bartime(BestList, BarListTimeless, BarList). 
  
- 
- 
-%iterate_barlist determines, if there are any persons to catch and continues or ends the recursion											
+%iterate_barlist determines, if there are any persons to catch and continues or ends the recursion                                                                                      
 iterate_barlist(Route_todo, Routelistdone) :-
  bars_todo(Route_todo, Bars_todo),
  length(Bars_todo,X),
- do_nextbar(X, Route_todo, Routelistdone).          			%Case
+ do_nextbar(X, Route_todo, Routelistdone).                              %Case
  
 %do_nextbar is something like a case in prolog :) 
-do_nextbar(0, Routelisttodo, Routelistdone) :-						%End recursion, if zero 
+do_nextbar(0, Routelisttodo, Routelistdone) :-                                          %End recursion, if zero 
  Routelistdone = Routelisttodo.
-do_nextbar(_, Routelisttodo, Routelistdone) :-						%go on, if there are waypoints to do
+do_nextbar(_, Routelisttodo, Routelistdone) :-                                          %go on, if there are waypoints to do
  barlist_iterator(Routelisttodo, Temp),
  iterate_barlist(Temp, Routelistdone). 
 
@@ -233,23 +258,22 @@ maximize_bartime(BestList, BarListTimeless, BarList) :-
  Resttime is Sperrstunde - Actualtime,
  get_route_duration(BarListTimeless, Drivetime),
  Usabletime is Resttime - Drivetime,
- length(BarListTimeless, Waypointcount),				%number of bars todo
- Timeprobar is Usabletime / Waypointcount,				%Aufenthaltszeit pro Bar
+ length(BarListTimeless, Waypointcount),                                %number of bars todo
+ Timeprobar is Usabletime / Waypointcount,                              %Aufenthaltszeit pro Bar
  add_bartime(BarListTimeless, Sperrstunde, Timeprobar, [], BarList).
  
 %add_bartime fuegt bei jeder Bar einen Aufenthalt in Hoehe von "Timetoadd" hinzu
 add_bartime([]         , _   , _        , Temp, BarList) :-
  BarList = Temp.
 add_bartime(BarListTodo, Time, Timetoadd, Temp, BarList) :-
- last(BarListTodo, Waypoint),											%letztes Element auswählen
- select(Waypoint, BarListTodo, NewTodo), 								%letztes Element entfernen
- [AlteLoc, AbAlt, AnNeu, NeueLoc] = Waypoint,							%alte Zeiten auslesen
- GoodAbAlt is Time - Timetoadd + AbAlt - AnNeu,							%korrekte Abfahrt bei AlteLoc berechnen
- GoodAnNeu is Time - Timetoadd,											%korrekte Ankunft an NeueLoc berechnen
- NewWaypoint = [[AlteLoc, GoodAbAlt, GoodAnNeu, NeueLoc]],				%Aktualisierten Wegpunkt generieren
- append(NewWaypoint, Temp, Next),										%Wegpunkt hinten anhaengen
- add_bartime(NewTodo, GoodAbAlt, Timetoadd, Next, BarList).				%rekursiver Aufruf
-
+ last(BarListTodo, Waypoint),                                                           %letztes Element auswählen
+ select(Waypoint, BarListTodo, NewTodo),                                                %letztes Element entfernen
+ [AlteLoc, AbAlt, AnNeu, NeueLoc] = Waypoint,                                           %alte Zeiten auslesen
+ GoodAbAlt is Time - Timetoadd + AbAlt - AnNeu,                                         %korrekte Abfahrt bei AlteLoc berechnen
+ GoodAnNeu is Time - Timetoadd,                                                         %korrekte Ankunft an NeueLoc berechnen
+ NewWaypoint = [[AlteLoc, GoodAbAlt, GoodAnNeu, NeueLoc]],                              %Aktualisierten Wegpunkt generieren
+ append(NewWaypoint, Temp, Next),                                                       %Wegpunkt hinten anhaengen
+ add_bartime(NewTodo, GoodAbAlt, Timetoadd, Next, BarList).                             %rekursiver Aufruf
 
 %returns the nearest bar
 get_nearest_bar(Lastlocation, Bars_todo, Bestbar) :-
@@ -268,16 +292,13 @@ get_bar_with_number(Number, Barlist, Bar) :-
  member([Number|Bar], Barlist).
 
 %next_bars generates a list like [[50, bar1], [80, bar2]]. The number defines the cost
-next_bars(_			  , []		 , Done, Barlist) :- 
+next_bars(_                       , []           , Done, Barlist) :- 
  Barlist = Done.
 next_bars(Lastlocation, Bars_todo, Done, Barlist) :-
  [Onebar | Rest] = Bars_todo,
  get_cost(Lastlocation, Onebar, Cost),
  append(Done, [[Cost, Onebar]], Appended),
  next_bars(Lastlocation, Rest, Appended, Barlist).
- 
-
- 
  
 bars_todo(Testroute, Bars_todo) :- 
  bars_done(Testroute, Bars_done),
@@ -292,6 +313,10 @@ get_bars(Route,Bars) :-
  last(X, Bars).
 get_bars(Route, Bars) :-
  member([Bars|_],Route). 
+ 
+ 
+ 
+ 
  
  
 
@@ -408,13 +433,3 @@ get_time_of_route(A,B):-
  B is End-Start.
 
 getfirst([First|_],First).
-
-/********************************
-Snippets {not used}
-*********************************/
-
-%print_first(X) :- all_list([X|S]).
-%print_second(X) :- print_first([X|S]).
-
-%all_return([X,Y,Z]) :- l(X),t(Y),l(Z),dif(X,Z).
-%all_list(Z) :- setof(X,all_return(X),Z).
